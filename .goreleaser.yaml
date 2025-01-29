@@ -1,0 +1,79 @@
+version: 2
+
+project_name: duh
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    binary: duh
+    main: ./
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: release_archive
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+dockers:
+  - image_templates:
+      - "yarlson/duh:{{ .Version }}-amd64"
+      - "yarlson/duh:latest-amd64"
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - image_templates:
+      - "yarlson/duh:{{ .Version }}-arm64"
+      - "yarlson/duh:latest-arm64"
+    goarch: arm64
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - name_template: "yarlson/duh:{{ .Version }}"
+    image_templates:
+      - "yarlson/duh:{{ .Version }}-amd64"
+      - "yarlson/duh:{{ .Version }}-arm64"
+
+  - name_template: "yarlson/duh:latest"
+    image_templates:
+      - "yarlson/duh:latest-amd64"
+      - "yarlson/duh:latest-arm64"
+
+release:
+  github:
+    owner: yarlson
+    name: duh
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+brews:
+  - name: duh
+    repository:
+      owner: yarlson
+      name: homebrew-duh
+    url_template: "https://github.com/yarlson/duh/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: Yar Kravtsov
+      email: yarlson@gmail.com
+    homepage: "https://github.com/yarlson/duh"
+    description: "duh - a minimalist Docker UI that doesn't get in your way."
+    license: "MIT"
+    test: |
+      system "#{bin}/duh --version"
+    install: |
+      bin.install "duh"
