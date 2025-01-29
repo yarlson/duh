@@ -134,6 +134,13 @@
             border-color: var(--status-exited-border);
         }
 
+        .container-card__status--starting,
+        .container-card__status--stopping {
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #ff8f00;
+            border-color: #ffc107;
+        }
+
         .container-card__details {
             display: flex;
             flex-direction: column;
@@ -290,6 +297,9 @@
         /** @type {HTMLElement} */
         const containerList = document.getElementById('containerList');
 
+        /** @type {Record<string, { pendingState: 'starting' | 'stopping', since: number }>} */
+        const pendingStateChanges = {};
+
         /**
          * Fetches container data from the Docker API
          * @returns {Promise<Container[]>}
@@ -394,11 +404,28 @@
          */
         function createContainerCard(container, stats) {
             const name = container.Names[0].replace(/^\//, '');
-            const statusClass = container.State === 'running' ? 'running' : 'stopped';
-            const isRunning = container.State === 'running';
+            const pendingChange = pendingStateChanges[container.Id];
+            
+            // Determine the actual status to display
+            let displayState = container.State;
+            let statusClass = container.State === 'running' ? 'running' : 'stopped';
+            
+            // If there's a pending state change that's not too old (less than 30 seconds)
+            if (pendingChange && (Date.now() - pendingChange.since) < 30000) {
+                displayState = pendingChange.pendingState;
+                statusClass = pendingChange.pendingState;
+            } else if (pendingChange) {
+                // Clean up old pending states
+                delete pendingStateChanges[container.Id];
+            }
+
+            // Determine checkbox state based on pending changes
+            const isChecked = pendingChange 
+                ? pendingChange.pendingState === 'starting'  // Use pending state for checkbox if exists
+                : container.State === 'running';             // Otherwise use actual state
 
             let statsHtml = '';
-            if (isRunning && stats) {
+            if (container.State === 'running' && stats) {
                 const memoryUsage = formatBytes(stats.memory_stats.usage);
                 const memoryLimit = formatBytes(stats.memory_stats.limit);
                 const cpuUsage = calculateCPUPercentage(stats);
@@ -416,7 +443,7 @@
                     <header class="container-card__header">
                         <h2 class="container-card__name">${name}</h2>
                         <span class="container-card__status container-card__status--${statusClass}">
-                            ${container.State}
+                            ${displayState}
                         </span>
                     </header>
                     <div class="container-card__details">
@@ -430,7 +457,8 @@
                     <footer class="container-card__footer">
                         <label class="switch">
                             <input type="checkbox" 
-                                ${isRunning ? 'checked' : ''} 
+                                ${isChecked ? 'checked' : ''} 
+                                ${pendingChange ? 'disabled' : ''}
                                 onchange="handleContainerToggle(event, '${container.Id}')"
                                 id="toggle-${container.Id}">
                             <span class="switch__slider"></span>
@@ -448,19 +476,54 @@
         async function handleContainerToggle(event, containerId) {
             const checkbox = event.target;
             const action = checkbox.checked ? 'start' : 'stop';
-
+            
+            // Set pending state
+            pendingStateChanges[containerId] = {
+                pendingState: checkbox.checked ? 'starting' : 'stopping',
+                since: Date.now()
+            };
+            
             checkbox.disabled = true;
-
+            
             try {
                 await controlContainer(containerId, action);
-                // Wait a bit for the container to change state
-                setTimeout(updateDashboard, 1000);
+                // Update immediately to show the pending state
+                await updateDashboard();
+                
+                // Start polling more frequently until state changes
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const containers = await fetchContainers();
+                        const container = containers.find(c => c.Id === containerId);
+                        
+                        if (container) {
+                            const expectedState = action === 'start' ? 'running' : 'exited';
+                            if (container.State === expectedState) {
+                                clearInterval(pollInterval);
+                                delete pendingStateChanges[containerId];
+                                updateDashboard();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error polling container state:', error);
+                    }
+                }, 1000); // Poll every second
+                
+                // Stop polling after 30 seconds regardless
+                setTimeout(() => {
+                    clearInterval(pollInterval);
+                    delete pendingStateChanges[containerId];
+                    updateDashboard();
+                }, 30000);
+                
             } catch (error) {
                 console.error(error);
-                checkbox.checked = !checkbox.checked; // Revert the toggle
+                delete pendingStateChanges[containerId];
+                checkbox.checked = !checkbox.checked;
                 alert(`Failed to ${action} container: ${error.message}`);
             } finally {
                 checkbox.disabled = false;
+                updateDashboard();
             }
         }
 
