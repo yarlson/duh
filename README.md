@@ -2,6 +2,8 @@
 
 A minimalist Docker UI that doesn't get in your way.
 
+![duh screenshot](/assets/screenshot.png)
+
 ## What
 
 - Real-time container stats
