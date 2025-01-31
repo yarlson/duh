@@ -1,2 +1,4 @@
 /dist/
 .idea
+/www/node_modules/
+/www/tsconfig.tsbuildinfo

@@ -1,0 +1,295 @@
+/* CSS Variables for theming */
+:root {
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #2d2d2d;
+    --bg-card: #333333;
+    --text-primary: #ffffff;
+    --text-secondary: #999999;
+    --accent: #64b5f6;
+    --border: rgba(255, 255, 255, 0.1);
+    --shadow: rgba(0, 0, 0, 0.2);
+    --status-running-bg: rgba(76, 175, 80, 0.2);
+    --status-running-text: #81c784;
+    --status-running-border: #4caf50;
+    --status-exited-bg: rgba(244, 67, 54, 0.2);
+    --status-exited-text: #ef5350;
+    --status-exited-border: #f44336;
+    --stats-bg: rgba(0, 0, 0, 0.2);
+    --status-starting-bg: rgba(255, 193, 7, 0.2);
+    --status-starting-text: #ffc107;
+    --status-starting-border: #ffc107;
+    --status-stopping-bg: rgba(255, 193, 7, 0.2);
+    --status-stopping-text: #ffc107;
+    --status-stopping-border: #ffc107;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #1a1a1a;
+        --bg-secondary: #2d2d2d;
+        --text-primary: #ffffff;
+        --text-secondary: #bbbbbb;
+        --accent: #64b5f6;
+        --border: #404040;
+        --shadow: rgba(0, 0, 0, 0.3);
+        --error-bg: rgba(244, 67, 54, 0.15);
+        --error-border: #ef5350;
+        --status-running-bg: rgba(76, 175, 80, 0.15);
+        --status-running-text: #81c784;
+        --status-running-border: #4caf50;
+        --status-exited-bg: rgba(244, 67, 54, 0.15);
+        --status-exited-text: #ef5350;
+        --status-exited-border: #f44336;
+        --hover-overlay: rgba(255, 255, 255, 0.05);
+        --status-starting-bg: rgba(255, 193, 7, 0.15);
+        --status-starting-text: #ffd54f;
+        --status-stopping-bg: rgba(255, 193, 7, 0.15);
+        --status-stopping-text: #ffd54f;
+    }
+}
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* BEM Components */
+.dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.dashboard__header {
+    margin-bottom: 2rem;
+}
+
+.dashboard__title {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.container-list {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+}
+
+.container-card {
+    background-color: var(--bg-card);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px var(--shadow);
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+    gap: 1.5rem;
+}
+
+.container-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.container-card__name {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--accent);
+    line-height: 1.2;
+    margin: 0;
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
+}
+
+.container-card__status {
+    display: inline-flex;
+    padding: 0.375rem 1rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-transform: lowercase;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.container-card__status--running {
+    background-color: var(--status-running-bg);
+    color: var(--status-running-text);
+}
+
+.container-card__status--exited {
+    background-color: var(--status-exited-bg);
+    color: var(--status-exited-text);
+}
+
+.container-card__status--starting {
+    background-color: var(--status-starting-bg);
+    color: var(--status-starting-text);
+    animation: pulse 2s infinite;
+}
+
+.container-card__status--stopping {
+    background-color: var(--status-stopping-bg);
+    color: var(--status-stopping-text);
+    animation: pulse 2s infinite;
+}
+
+.container-card__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.container-card__image {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin: 0;
+    word-break: break-word;
+}
+
+.container-card__stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+    font-size: 0.9375rem;
+}
+
+.container-card__stats p {
+    display: inline-flex;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--stats-bg);
+    border-radius: 6px;
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.container-card__footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+}
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+}
+
+.error {
+    background-color: var(--error-bg);
+    border-left: 4px solid var(--error-border);
+    color: var(--text-primary);
+    padding: 1.5rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    white-space: pre-line;
+}
+
+.error__retry {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch__slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--status-exited-bg);
+    transition: 0.2s;
+    border-radius: 24px;
+}
+
+.switch__slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--status-exited-text);
+    transition: 0.2s;
+    border-radius: 50%;
+}
+
+.switch input:checked+.switch__slider {
+    background-color: var(--status-running-bg);
+}
+
+.switch input:checked+.switch__slider:before {
+    transform: translateX(20px);
+    background-color: var(--status-running-text);
+}
+
+.switch input:disabled+.switch__slider {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.switch input:disabled+.switch__slider:before {
+    animation: pulse 2s infinite;
+}
+
+/* Update switch colors for different states */
+.switch input[disabled]:checked+.switch__slider {
+    background-color: var(--status-stopping-bg);
+}
+
+.switch input[disabled]:checked+.switch__slider:before {
+    background-color: var(--status-stopping-text);
+}
+
+.switch input[disabled]:not(:checked)+.switch__slider {
+    background-color: var(--status-starting-bg);
+}
+
+.switch input[disabled]:not(:checked)+.switch__slider:before {
+    background-color: var(--status-starting-text);
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}

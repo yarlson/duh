@@ -2,6 +2,10 @@ version: 2
 
 project_name: duh
 
+before:
+  hooks:
+    - cd www && npm install && npm run build
+
 builds:
   - env:
       - CGO_ENABLED=0
