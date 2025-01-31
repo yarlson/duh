@@ -2,10 +2,6 @@ version: 2
 
 project_name: duh
 
-before:
-  hooks:
-    - cd www && npm install && npm run build
-
 builds:
   - env:
       - CGO_ENABLED=0
@@ -22,6 +18,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{.Version}}
+    hooks:
+      pre:
+        - cd www && bun install && bun run build
 
 archives:
   - id: release_archive
