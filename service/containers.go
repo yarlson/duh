@@ -116,55 +116,64 @@ func (s *ContainerService) SyncContainers(ctx context.Context) ([]docker.Contain
 func (s *ContainerService) SyncStats(ctx context.Context, containers []docker.Container) {
 	var wg sync.WaitGroup
 	for _, c := range containers {
-		// Update stats only for running containers.
-		if c.State == "running" {
-			wg.Add(1)
-			go func(c docker.Container) {
-				defer wg.Done()
-				stats, err := s.client.GetContainerStats(ctx, c.ID)
-				if err != nil {
-					return // Skip stats on error
-				}
-
-				// Convert Docker stats to store stats.
-				storeStats := &store.Stats{}
-				storeStats.Memory.Usage = stats.MemoryStats.Usage
-				storeStats.Memory.Limit = stats.MemoryStats.Limit
-
-				// Calculate CPU percentage.
-				cpuDelta := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
-				systemDelta := stats.CPUStats.SystemCPUUsage - stats.PreCPUStats.SystemCPUUsage
-
-				if systemDelta > 0 && cpuDelta > 0 {
-					// Convert to nanoseconds for more precise calculation
-					cpuDeltaNs := float64(cpuDelta)
-					systemDeltaNs := float64(systemDelta)
-
-					// Calculate CPU usage percentage per core
-					numCPUs := float64(stats.CPUStats.OnlineCPUs)
-					if numCPUs == 0 {
-						numCPUs = 1 // fallback if OnlineCPUs is not reported
-					}
-
-					// Calculate CPU usage percentage
-					// This gives us the percentage of CPU time this container used
-					// across all cores during this interval
-					cpuPercent := (cpuDeltaNs / systemDeltaNs) * 100.0
-
-					// Scale to per-core percentage (e.g., 50% of 2 cores = 100%)
-					cpuPercent *= numCPUs
-
-					// Round to 2 decimal places for display
-					cpuPercent = float64(int(cpuPercent*100)) / 100
-
-					storeStats.CPU.Usage = cpuPercent
-				}
-				storeStats.CPU.Cores = stats.CPUStats.OnlineCPUs
-				storeStats.CPU.SystemMS = stats.CPUStats.SystemCPUUsage / 1_000_000 // Convert to milliseconds
-
-				s.store.UpdateStats(c.ID, storeStats)
-			}(c)
+		// Skip containers that are not running or are in transition states
+		if c.State != "running" {
+			continue
 		}
+
+		// Check if container is in a transition state
+		if stored, exists := s.store.Get(c.ID); exists {
+			if stored.State == store.StateStarting || stored.State == store.StateStopping {
+				continue // Skip containers in transition
+			}
+		}
+
+		wg.Add(1)
+		go func(c docker.Container) {
+			defer wg.Done()
+			stats, err := s.client.GetContainerStats(ctx, c.ID)
+			if err != nil {
+				return // Skip stats on error
+			}
+
+			// Convert Docker stats to store stats.
+			storeStats := &store.Stats{}
+			storeStats.Memory.Usage = stats.MemoryStats.Usage
+			storeStats.Memory.Limit = stats.MemoryStats.Limit
+
+			// Calculate CPU percentage.
+			cpuDelta := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
+			systemDelta := stats.CPUStats.SystemCPUUsage - stats.PreCPUStats.SystemCPUUsage
+
+			if systemDelta > 0 && cpuDelta > 0 {
+				// Convert to nanoseconds for more precise calculation
+				cpuDeltaNs := float64(cpuDelta)
+				systemDeltaNs := float64(systemDelta)
+
+				// Calculate CPU usage percentage per core
+				numCPUs := float64(stats.CPUStats.OnlineCPUs)
+				if numCPUs == 0 {
+					numCPUs = 1 // fallback if OnlineCPUs is not reported
+				}
+
+				// Calculate CPU usage percentage
+				// This gives us the percentage of CPU time this container used
+				// across all cores during this interval
+				cpuPercent := (cpuDeltaNs / systemDeltaNs) * 100.0
+
+				// Scale to per-core percentage (e.g., 50% of 2 cores = 100%)
+				cpuPercent *= numCPUs
+
+				// Round to 2 decimal places for display
+				cpuPercent = float64(int(cpuPercent*100)) / 100
+
+				storeStats.CPU.Usage = cpuPercent
+			}
+			storeStats.CPU.Cores = stats.CPUStats.OnlineCPUs
+			storeStats.CPU.SystemMS = stats.CPUStats.SystemCPUUsage / 1_000_000 // Convert to milliseconds
+
+			s.store.UpdateStats(c.ID, storeStats)
+		}(c)
 	}
 	wg.Wait()
 }
