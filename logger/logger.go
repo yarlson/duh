@@ -12,7 +12,7 @@ type Logger struct {
 }
 
 func New() *Logger {
-	prefix := fmt.Sprintf("\033[36mduh\033[0m \033[90m>\033[0m ")
+	prefix := "\033[36mduh\033[0m \033[90m>\033[0m "
 	logger := log.New(os.Stdout, prefix, 0)
 	return &Logger{logger}
 }

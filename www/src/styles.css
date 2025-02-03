@@ -328,3 +328,31 @@ body {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
 }
+
+@keyframes skeleton-loading {
+  0% {
+    background-color: var(--stats-bg);
+  }
+
+  50% {
+    background-color: var(--hover-overlay);
+  }
+
+  100% {
+    background-color: var(--stats-bg);
+  }
+}
+
+.container-card__stats--loading {
+  animation: skeleton-loading 2s ease-in-out infinite;
+}
+
+.skeleton-text {
+  color: var(--text-secondary);
+  background-color: var(--hover-overlay);
+  border-radius: 3px;
+  padding: 0 4px;
+  display: inline-block;
+  min-width: 4em;
+  animation: skeleton-loading 2s ease-in-out infinite;
+}

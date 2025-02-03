@@ -45,9 +45,14 @@ func main() {
 	memoryStore := store.NewStore(30 * time.Second)
 	containerService := service.New(dockerClient, memoryStore)
 
-	if err := containerService.Sync(context.Background()); err != nil {
+	containers, err := containerService.SyncContainers(context.Background())
+	if err != nil {
 		l.Fatal("Initial sync failed: %v", err)
 	}
+
+	go func() {
+		containerService.SyncStats(context.Background(), containers)
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

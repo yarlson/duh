@@ -5,8 +5,9 @@ package server
 
 import (
 	"context"
-	"github.com/yarlson/duh/docker"
 	"sync"
+
+	"github.com/yarlson/duh/docker"
 )
 
 // Ensure, that DockerClientMock does implement DockerClient.

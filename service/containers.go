@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"sort"
+	"sync"
 
 	"github.com/yarlson/duh/docker"
 	"github.com/yarlson/duh/store"
@@ -41,28 +42,27 @@ func New(client DockerClient, store Store) *ContainerService {
 	}
 }
 
-// Sync updates container data and stats from Docker
-func (s *ContainerService) Sync(ctx context.Context) error {
-	// Get all containers
+// SyncContainers updates the container list from Docker and handles state transitions.
+// It returns the list of containers from Docker so that stats can be updated separately.
+func (s *ContainerService) SyncContainers(ctx context.Context) ([]docker.Container, error) {
+	// Get all containers from Docker.
 	containers, err := s.client.ListContainers(ctx, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Create a map for quick container lookup
+	// Create a map for quick container lookup.
 	containerMap := make(map[string]docker.Container)
 	for _, c := range containers {
 		containerMap[c.ID] = c
 	}
 
-	// First check all stored containers for state transitions
+	// First, check all stored containers for state transitions.
 	for _, stored := range s.store.List() {
 		dockerC, exists := containerMap[stored.ID]
-
 		switch stored.State {
 		case store.StateStarting:
 			if !exists || dockerC.State == "running" {
-				// Container has finished starting
 				if exists {
 					s.store.Update(store.ContainerData{
 						ID:      dockerC.ID,
@@ -76,7 +76,6 @@ func (s *ContainerService) Sync(ctx context.Context) error {
 			}
 		case store.StateStopping:
 			if !exists || dockerC.State == "exited" {
-				// Container has finished stopping
 				if exists {
 					s.store.Update(store.ContainerData{
 						ID:      dockerC.ID,
@@ -91,7 +90,7 @@ func (s *ContainerService) Sync(ctx context.Context) error {
 		}
 	}
 
-	// Then update all containers that aren't in transition
+	// Then, update all containers that aren't in transition.
 	for _, c := range containers {
 		if stored, exists := s.store.Get(c.ID); exists {
 			if stored.State == store.StateStarting || stored.State == store.StateStopping {
@@ -108,34 +107,75 @@ func (s *ContainerService) Sync(ctx context.Context) error {
 			Created: c.Created,
 		}
 		s.store.Update(data)
+	}
+	return containers, nil
+}
 
-		// Get stats only for running containers
+// SyncStats updates statistics for running containers.
+// It accepts the container list (typically returned from SyncContainers) so that these operations are decoupled.
+func (s *ContainerService) SyncStats(ctx context.Context, containers []docker.Container) {
+	var wg sync.WaitGroup
+	for _, c := range containers {
+		// Update stats only for running containers.
 		if c.State == "running" {
-			stats, err := s.client.GetContainerStats(ctx, c.ID)
-			if err != nil {
-				continue // Skip stats on error
-			}
+			wg.Add(1)
+			go func(c docker.Container) {
+				defer wg.Done()
+				stats, err := s.client.GetContainerStats(ctx, c.ID)
+				if err != nil {
+					return // Skip stats on error
+				}
 
-			// Convert Docker stats to store stats
-			storeStats := &store.Stats{}
-			storeStats.Memory.Usage = stats.MemoryStats.Usage
-			storeStats.Memory.Limit = stats.MemoryStats.Limit
+				// Convert Docker stats to store stats.
+				storeStats := &store.Stats{}
+				storeStats.Memory.Usage = stats.MemoryStats.Usage
+				storeStats.Memory.Limit = stats.MemoryStats.Limit
 
-			// Calculate CPU percentage
-			cpuDelta := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
-			systemDelta := stats.CPUStats.SystemCPUUsage - stats.PreCPUStats.SystemCPUUsage
+				// Calculate CPU percentage.
+				cpuDelta := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
+				systemDelta := stats.CPUStats.SystemCPUUsage - stats.PreCPUStats.SystemCPUUsage
 
-			if systemDelta > 0 && cpuDelta > 0 {
-				storeStats.CPU.Usage = float64(cpuDelta) / float64(systemDelta) * 100.0 * float64(stats.CPUStats.OnlineCPUs)
-			}
-			storeStats.CPU.Cores = stats.CPUStats.OnlineCPUs
-			storeStats.CPU.SystemMS = stats.CPUStats.SystemCPUUsage / 1_000_000 // Convert to milliseconds
+				if systemDelta > 0 && cpuDelta > 0 {
+					// Convert to nanoseconds for more precise calculation
+					cpuDeltaNs := float64(cpuDelta)
+					systemDeltaNs := float64(systemDelta)
 
-			s.store.UpdateStats(c.ID, storeStats)
+					// Calculate CPU usage percentage per core
+					numCPUs := float64(stats.CPUStats.OnlineCPUs)
+					if numCPUs == 0 {
+						numCPUs = 1 // fallback if OnlineCPUs is not reported
+					}
+
+					// Calculate CPU usage percentage
+					// This gives us the percentage of CPU time this container used
+					// across all cores during this interval
+					cpuPercent := (cpuDeltaNs / systemDeltaNs) * 100.0
+
+					// Scale to per-core percentage (e.g., 50% of 2 cores = 100%)
+					cpuPercent *= numCPUs
+
+					// Round to 2 decimal places for display
+					cpuPercent = float64(int(cpuPercent*100)) / 100
+
+					storeStats.CPU.Usage = cpuPercent
+				}
+				storeStats.CPU.Cores = stats.CPUStats.OnlineCPUs
+				storeStats.CPU.SystemMS = stats.CPUStats.SystemCPUUsage / 1_000_000 // Convert to milliseconds
+
+				s.store.UpdateStats(c.ID, storeStats)
+			}(c)
 		}
 	}
+	wg.Wait()
+}
 
-	// Clean up stale data
+// Sync is updated to first sync the container list and then the statistics.
+func (s *ContainerService) Sync(ctx context.Context) error {
+	containers, err := s.SyncContainers(ctx)
+	if err != nil {
+		return err
+	}
+	s.SyncStats(ctx, containers)
 	s.store.RemoveStaleData()
 	return nil
 }

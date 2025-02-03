@@ -28,6 +28,20 @@ function getContainerStateLabel(state: string): string {
   }
 }
 
+// Add this new component for the stats skeleton
+const StatsSkeleton = memo(function StatsSkeleton() {
+  return (
+    <div className="container-card__stats container-card__stats--loading">
+      <p>
+        CPU: <span className="skeleton-text">--.--%</span>
+      </p>
+      <p>
+        Memory: <span className="skeleton-text">--.- MB / --.- GB</span>
+      </p>
+    </div>
+  );
+});
+
 // Memoized container card component
 const ContainerCard = memo(function ContainerCard({
   container,
@@ -52,15 +66,18 @@ const ContainerCard = memo(function ContainerCard({
       </div>
       <div className="container-card__content">
         <p className="container-card__image">{container.image}</p>
-        {container.stats && (
-          <div className="container-card__stats">
-            <p>CPU: {container.stats.cpu_stats.usage.toFixed(1)}%</p>
-            <p>
-              Memory: {formatBytes(container.stats.memory_stats.usage)} /{" "}
-              {formatBytes(container.stats.memory_stats.limit)}
-            </p>
-          </div>
-        )}
+        {container.state === "running" &&
+          (container.stats ? (
+            <div className="container-card__stats">
+              <p>CPU: {container.stats.cpu_stats.usage.toFixed(1)}%</p>
+              <p>
+                Memory: {formatBytes(container.stats.memory_stats.usage)} /{" "}
+                {formatBytes(container.stats.memory_stats.limit)}
+              </p>
+            </div>
+          ) : (
+            <StatsSkeleton />
+          ))}
       </div>
       <div className="container-card__footer">
         <label className="switch">
@@ -143,7 +160,7 @@ export function ContainerList() {
 
   if (isLoading) return <div className="loading">Loading...</div>;
   if (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    const message = error.message;
     return (
       <div className="error">
         Error: {message}

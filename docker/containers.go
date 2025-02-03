@@ -119,19 +119,6 @@ func (c *Client) GetContainerStats(ctx context.Context, containerID string) (*Co
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	// Calculate CPU percentage
-	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage)
-	systemDelta := float64(stats.CPUStats.SystemCPUUsage - stats.PreCPUStats.SystemCPUUsage)
-
-	// Update CPU stats
-	if systemDelta > 0 && cpuDelta > 0 {
-		numCPUs := float64(stats.CPUStats.OnlineCPUs)
-		if numCPUs == 0 {
-			numCPUs = 1 // fallback if OnlineCPUs is not reported
-		}
-		stats.CPUStats.CPUUsage.TotalUsage = uint64((cpuDelta / systemDelta) * numCPUs * 100.0)
-	}
-
 	return &stats, nil
 }
 

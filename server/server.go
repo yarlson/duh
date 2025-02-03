@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
-	"github.com/yarlson/duh/logger"
 	"io"
 	"io/fs"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yarlson/duh/docker"
+	"github.com/yarlson/duh/logger"
 	"github.com/yarlson/duh/service"
 )
 
