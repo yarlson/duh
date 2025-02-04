@@ -101,6 +101,8 @@ const ContainerCard = memo(function ContainerCard({
 
 export function ContainerList() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
+
   const queryClient = useQueryClient();
 
   const {
@@ -146,13 +148,29 @@ export function ContainerList() {
     [containers, searchTerm, filterContainers],
   );
 
-  // Memoized toggle handler
+  // Updated memoized toggle handler - track pending container id individually.
   const handleToggle = useCallback(
     (id: string, currentState: string) => {
+      // Add the container id to pendingIds
+      setPendingIds((prev) => [...prev, id]);
       if (currentState === "running") {
-        stopMutation.mutate(id);
+        stopMutation.mutate(id, {
+          onSettled: () => {
+            // Remove container id once mutation is settled
+            setPendingIds((prev) =>
+              prev.filter((pendingId) => pendingId !== id),
+            );
+          },
+        });
       } else if (currentState === "exited") {
-        startMutation.mutate(id);
+        startMutation.mutate(id, {
+          onSettled: () => {
+            // Remove container id once mutation is settled
+            setPendingIds((prev) =>
+              prev.filter((pendingId) => pendingId !== id),
+            );
+          },
+        });
       }
     },
     [startMutation, stopMutation],
@@ -189,7 +207,8 @@ export function ContainerList() {
           key={container.id}
           container={container}
           onToggle={handleToggle}
-          isLoading={startMutation.isPending || stopMutation.isPending}
+          // Use individual pending state for each container instead of a global loading indicator
+          isLoading={pendingIds.includes(container.id)}
         />
       ))}
     </div>
